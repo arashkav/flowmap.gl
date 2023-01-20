@@ -1,19 +1,7 @@
 /*
- * Copyright 2022 FlowmapBlue
- * Copyright 2018-2020 Teralytics, modified by FlowmapBlue
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
+ * Copyright (c) Flowmap.gl contributors
+ * Copyright (c) 2018-2020 Teralytics
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
@@ -60,7 +48,12 @@ export interface ClusterIndex<F> {
   aggregateFlows: (
     flows: F[],
     zoom: number,
-    {getFlowOriginId, getFlowDestId, getFlowMagnitude}: FlowAccessors<F>,
+    {
+      getFlowOriginId,
+      getFlowDestId,
+      getFlowMagnitude,
+      getFlowAggFunc,
+    }: FlowAccessors<F>,
     options?: {
       flowCountsMapReduce?: FlowCountsMapReduce<F>;
     },
@@ -177,11 +170,15 @@ export function buildIndex<F>(clusterLevels: ClusterLevels): ClusterIndex<F> {
     aggregateFlows: (
       flows,
       zoom,
-      {getFlowOriginId, getFlowDestId, getFlowMagnitude},
+      {getFlowOriginId, getFlowDestId, getFlowMagnitude, getFlowAggFunc},
       options = {},
     ) => {
       if (zoom > maxZoom) {
         return flows;
+      }
+      if (!getFlowAggFunc) {
+        getFlowAggFunc = (flowValues: number[]) =>
+          flowValues.reduce((a, b) => a + b, 0);
       }
       const result: (F | AggregateFlow)[] = [];
       const aggFlowsByKey = new Map<string, AggregateFlow>();
@@ -190,7 +187,7 @@ export function buildIndex<F>(clusterLevels: ClusterLevels): ClusterIndex<F> {
       const {
         flowCountsMapReduce = {
           map: getFlowMagnitude,
-          reduce: (acc: any, count: number) => (acc || 0) + count,
+          reduce: getFlowAggFunc,
         },
       } = options;
       for (const flow of flows) {
@@ -209,13 +206,14 @@ export function buildIndex<F>(clusterLevels: ClusterLevels): ClusterIndex<F> {
               dest: destCluster,
               count: flowCountsMapReduce.map(flow),
               aggregate: true,
+              values: [flowCountsMapReduce.map(flow)],
             };
             result.push(aggregateFlow);
             aggFlowsByKey.set(key, aggregateFlow);
           } else {
+            aggregateFlow.values.push(flowCountsMapReduce.map(flow));
             aggregateFlow.count = flowCountsMapReduce.reduce(
-              aggregateFlow.count,
-              flowCountsMapReduce.map(flow),
+              aggregateFlow.values,
             );
           }
         }

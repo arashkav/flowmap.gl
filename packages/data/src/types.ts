@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) Flowmap.gl contributors
+ * Copyright (c) 2018-2020 Teralytics
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 export type FlowmapData<L, F> = {
   locations: Iterable<L> | undefined;
   flows: Iterable<F> | undefined;
@@ -16,12 +22,15 @@ export interface ViewState {
 export type FlowAccessor<F, T> = (flow: F) => T; // objectInfo?: AccessorObjectInfo,
 export type LocationAccessor<L, T> = (location: L) => T;
 
+export type FlowAggregatorFunc<V, T> = (values: V) => T;
+
 export interface FlowAccessors<F> {
   getFlowOriginId: FlowAccessor<F, string | number>;
   getFlowDestId: FlowAccessor<F, string | number>;
   getFlowMagnitude: FlowAccessor<F, number>;
   getFlowTime?: FlowAccessor<F, Date>; // TODO: use number instead of Date
   // getFlowColor?: FlowAccessor<string | undefined>;
+  getFlowAggFunc: FlowAggregatorFunc<number[], number>;
 }
 
 export interface LocationAccessors<L> {
@@ -109,6 +118,7 @@ export interface AggregateFlow {
   dest: string | number;
   count: number;
   aggregate: true;
+  values: number[];
 }
 
 export function isAggregateFlow(
@@ -125,7 +135,7 @@ export function isAggregateFlow(
 
 export interface FlowCountsMapReduce<F, T = any> {
   map: (flow: F) => T;
-  reduce: (accumulated: T, val: T) => T;
+  reduce: (values: T) => T;
 }
 
 export enum LocationFilterMode {
